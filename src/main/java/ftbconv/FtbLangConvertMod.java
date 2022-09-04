@@ -12,6 +12,9 @@ import dev.ftb.mods.ftbquests.quest.*;
 import dev.ftb.mods.ftbquests.quest.loot.RewardTable;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
 import dev.ftb.mods.ftbquests.quest.task.Task;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.LanguageInfo;
@@ -19,11 +22,6 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.TextComponent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.loading.FMLPaths;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
 
@@ -39,18 +37,11 @@ import java.util.regex.Pattern;
 
 import static net.minecraft.commands.Commands.literal;
 
-@Mod( "ftbconv" )
-public class FtbLangConvertMod{
-	public FtbLangConvertMod(){
-		MinecraftForge.EVENT_BUS.register(this);
-	}
+public class FtbLangConvertMod implements ModInitializer{
 
 	public static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-	@SubscribeEvent
-	public void serverRegisterCommandsEvent(RegisterCommandsEvent event){
-		CommandDispatcher<CommandSourceStack> commandDispatcher = event.getDispatcher();
-
+	private static void serverRegisterCommandsEvent(CommandDispatcher<CommandSourceStack> commandDispatcher, Boolean dedicated){
 		RootCommandNode<CommandSourceStack> rootCommandNode = commandDispatcher.getRoot();
 		LiteralCommandNode<CommandSourceStack> commandNode = literal("ftb-lang-convert").executes(context -> {
 			return 0;
@@ -60,9 +51,9 @@ public class FtbLangConvertMod{
 			return SharedSuggestionProvider.suggest(Minecraft.getInstance().getLanguageManager().getLanguages().stream().map(LanguageInfo::getCode).toList().toArray(new String[0]), c2);
 		}).executes(Ctx -> {
 			try{
-				File parent = new File(FMLPaths.GAMEDIR.get().toFile(), "ftb-conv");
+				File parent = new File(FabricLoader.getInstance().getGameDir().toFile(), "ftb-conv");
 				File transFiles = new File(parent, "kubejs/assets/kubejs/lang/");
-				File questsFolder = new File(FMLPaths.GAMEDIR.get().toFile(), "config/ftbquests/");
+				File questsFolder = new File(FabricLoader.getInstance().getGameDir().toFile(), "config/ftbquests/");
 
 				if(questsFolder.exists()){
 					File backup = new File(parent, "backup/ftbquests");
@@ -216,8 +207,15 @@ public class FtbLangConvertMod{
 		commandNode.addChild(argumentCommandNode);
 	}
 
-	private void saveLang(TreeMap<String, String> transKeys, String lang, File parent) throws IOException{
+	private static void saveLang(TreeMap<String, String> transKeys, String lang, File parent) throws IOException{
 		File fe = new File(parent, lang.toLowerCase(Locale.ROOT) + ".json");
 		FileUtils.write(fe, FtbLangConvertMod.gson.toJson(transKeys), StandardCharsets.UTF_8);
+	}
+
+	@Override
+	public void onInitialize() {
+		CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
+			serverRegisterCommandsEvent(dispatcher, dedicated);
+		});
 	}
 }
